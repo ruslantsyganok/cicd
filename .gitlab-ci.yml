@@ -1,0 +1,46 @@
+image: golang:latest
+
+stages:
+  - build
+  - test
+  - pre-deploy
+  - deploy
+
+build:
+  stage: build
+  script:
+    - cd cmd; go build main.go
+  artifacts:
+    paths:
+      - cmd/main
+
+tests:
+  stage: test
+  script:
+    - go test ./...
+
+linter:
+  image: golangci/golangci-lint
+  stage: test
+  script:
+    - golangci-lint run --timeout=10m
+
+create image:
+  image: docker
+  services:
+    - docker:dind
+  stage: pre-deploy
+  script:
+    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER $CI_REGISTRY --password-stdin
+    - docker build -t $CI_REGISTRY_IMAGE .
+    - docker push $CI_REGISTRY_IMAGE
+
+variables:
+  DOCKER_TLS_CERTDIR: ""
+
+run:
+  stage: deploy
+  script:
+    - echo "./main"
+  only:
+    - release
